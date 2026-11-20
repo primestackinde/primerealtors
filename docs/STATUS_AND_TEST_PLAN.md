@@ -124,6 +124,10 @@ The old blog implementation was unsafe and partly broken:
 
 ## 3. What is NOT verified yet (test these)
 
+> Full numbered step-by-step QA script (steps + expected result for every
+> case): **[`TEST_SCENARIOS.md`](TEST_SCENARIOS.md)**. The summary below
+> points at the same areas.
+
 ### A. Editor flow end-to-end (highest priority)
 
 Sign-in credentials today: `primestack02@gmail.com` /

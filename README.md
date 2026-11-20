@@ -8,6 +8,9 @@ Prime Realtors website (prime-realtors.in).
 - **Status / test plan**: [`docs/STATUS_AND_TEST_PLAN.md`](docs/STATUS_AND_TEST_PLAN.md)
   — what has been done and verified, what still needs testing, and the
   remaining implementation steps.
+- **Test scenarios**: [`docs/TEST_SCENARIOS.md`](docs/TEST_SCENARIOS.md) —
+  numbered step-by-step QA script (auth, editor, lifecycle, security, SEO,
+  edge).
 - Commands: `npm run dev` (local), `npm run build` (bundle),
   `npm run lint` (oxlint), `npm test` (vitest).
 
