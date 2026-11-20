@@ -5,6 +5,9 @@ Prime Realtors website (prime-realtors.in).
 - **Article CMS / blog**: see [`docs/BLOG_CMS.md`](docs/BLOG_CMS.md) for the
   content model, the `/admin` editor, SEO behaviour and the one-time Supabase
   setup steps.
+- **Status / test plan**: [`docs/STATUS_AND_TEST_PLAN.md`](docs/STATUS_AND_TEST_PLAN.md)
+  — what has been done and verified, what still needs testing, and the
+  remaining implementation steps.
 - Commands: `npm run dev` (local), `npm run build` (bundle),
   `npm run lint` (oxlint), `npm test` (vitest).
 
