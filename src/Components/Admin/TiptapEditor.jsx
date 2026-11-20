@@ -1,73 +1,97 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
 import Link from '@tiptap/extension-link'
 import Image from '@tiptap/extension-image'
+import { uploadArticleImage } from '../../data/blogService.js'
 import './TiptapEditor.css'
 
-export default function TiptapEditor({ content, onChange }) {
+/**
+ * Rich text editor for the article body.
+ *
+ * Images are uploaded to Supabase Storage (never stored as base64 in the
+ * article row), and the `content` prop is only pushed back into the editor
+ * when it did not come from the editor itself, so the cursor and undo history
+ * survive typing.
+ */
+export default function TiptapEditor({ content, onChange, slug }) {
   const fileInputRef = useRef(null)
+  const lastEmitted = useRef(content)
+
+  const [panel, setPanel] = useState(false)
+  const [imageMode, setImageMode] = useState('upload')
+  const [imageUrl, setImageUrl] = useState('')
+  const [imageAlt, setImageAlt] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const [imageError, setImageError] = useState('')
 
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
-        heading: {
-          levels: [1, 2, 3],
-        },
+        // The page already owns the single <h1>; articles may only use h2/h3.
+        heading: { levels: [2, 3] },
       }),
       Underline,
       Link.configure({
         openOnClick: false,
-        HTMLAttributes: {
-          target: '_blank',
-          rel: 'noopener noreferrer',
-        },
+        HTMLAttributes: { target: '_blank', rel: 'noopener noreferrer' },
       }),
       Image.configure({
         inline: true,
         allowBase64: true,
+        HTMLAttributes: { loading: 'lazy' },
       }),
     ],
-    content: content || '<p>Start writing your blog post...</p>',
-    onUpdate: ({ editor }) => {
-      onChange(editor.getHTML())
+    content: content || '<p></p>',
+    onUpdate: ({ editor: current }) => {
+      const html = current.getHTML()
+      lastEmitted.current = html
+      onChange(html)
     },
   })
 
-  // Keep editor content in sync when loaded dynamically (e.g. from Supabase)
+  // Pull in content loaded from the database without echoing our own edits
+  // back through onChange (which would mark the draft dirty on every keystroke).
   useEffect(() => {
-    if (editor && content && editor.getHTML() !== content) {
-      editor.commands.setContent(content)
+    if (!editor || content === lastEmitted.current) return
+    if (editor.getHTML() === content) {
+      lastEmitted.current = content
+      return
     }
+    lastEmitted.current = content
+    editor.commands.setContent(content, { emitUpdate: false })
   }, [content, editor])
 
-  if (!editor) {
-    return null
+  if (!editor) return null
+
+  const closePanel = () => {
+    setPanel(false)
+    setImageError('')
+    setImageUrl('')
+    setImageAlt('')
+    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
-  const handleFileUpload = (e) => {
-    const file = e.target.files[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        if (reader.result) {
-          editor.chain().focus().setImage({ src: reader.result }).run()
-        }
-      }
-      reader.readAsDataURL(file)
-    }
+  const insertImage = (src) => {
+    if (!src) return
+    editor.chain().focus().setImage({ src, alt: imageAlt.trim() }).run()
+    closePanel()
   }
 
-  const addImage = () => {
-    const choice = window.confirm('Click OK to upload an image from your computer, or Cancel to enter an Image URL.')
-    if (choice) {
-      if (fileInputRef.current) fileInputRef.current.click()
-    } else {
-      const url = window.prompt('Enter Image URL (e.g. /blog/why-investing-open-plots-hyderabad.webp):')
-      if (url) {
-        editor.chain().focus().setImage({ src: url }).run()
-      }
+  const handleFileUpload = async (event) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    setUploading(true)
+    setImageError('')
+    try {
+      const url = await uploadArticleImage(file, { slug: slug || 'article' })
+      insertImage(url)
+    } catch (err) {
+      setImageError(err.message || 'Could not upload the image.')
+    } finally {
+      setUploading(false)
     }
   }
 
@@ -83,167 +107,220 @@ export default function TiptapEditor({ content, onChange }) {
     editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run()
   }
 
+  const buttons = [
+    {
+      key: 'undo',
+      label: '↶',
+      title: 'Undo (Ctrl+Z)',
+      disabled: !editor.can().undo(),
+      onClick: () => editor.chain().focus().undo().run(),
+    },
+    {
+      key: 'redo',
+      label: '↷',
+      title: 'Redo (Ctrl+Y)',
+      disabled: !editor.can().redo(),
+      onClick: () => editor.chain().focus().redo().run(),
+    },
+    { key: 'sep1' },
+    {
+      key: 'h2',
+      label: 'H2',
+      title: 'Heading 2',
+      active: editor.isActive('heading', { level: 2 }),
+      onClick: () => editor.chain().focus().toggleHeading({ level: 2 }).run(),
+    },
+    {
+      key: 'h3',
+      label: 'H3',
+      title: 'Heading 3',
+      active: editor.isActive('heading', { level: 3 }),
+      onClick: () => editor.chain().focus().toggleHeading({ level: 3 }).run(),
+    },
+    {
+      key: 'p',
+      label: '¶',
+      title: 'Normal paragraph',
+      active: editor.isActive('paragraph') && !editor.isActive('heading'),
+      onClick: () => editor.chain().focus().setParagraph().run(),
+    },
+    { key: 'sep2' },
+    {
+      key: 'ul',
+      label: '•≡',
+      title: 'Bullet list',
+      active: editor.isActive('bulletList'),
+      onClick: () => editor.chain().focus().toggleBulletList().run(),
+    },
+    {
+      key: 'ol',
+      label: '1≡',
+      title: 'Numbered list',
+      active: editor.isActive('orderedList'),
+      onClick: () => editor.chain().focus().toggleOrderedList().run(),
+    },
+    {
+      key: 'quote',
+      label: '❝',
+      title: 'Quote',
+      active: editor.isActive('blockquote'),
+      onClick: () => editor.chain().focus().toggleBlockquote().run(),
+    },
+    { key: 'sep3' },
+    {
+      key: 'bold',
+      label: '<b>B</b>',
+      title: 'Bold (Ctrl+B)',
+      active: editor.isActive('bold'),
+      onClick: () => editor.chain().focus().toggleBold().run(),
+    },
+    {
+      key: 'italic',
+      label: '<i>I</i>',
+      title: 'Italic (Ctrl+I)',
+      active: editor.isActive('italic'),
+      onClick: () => editor.chain().focus().toggleItalic().run(),
+    },
+    {
+      key: 'underline',
+      label: '<u>U</u>',
+      title: 'Underline (Ctrl+U)',
+      active: editor.isActive('underline'),
+      onClick: () => editor.chain().focus().toggleUnderline().run(),
+    },
+    {
+      key: 'strike',
+      label: '<s>S</s>',
+      title: 'Strikethrough',
+      active: editor.isActive('strike'),
+      onClick: () => editor.chain().focus().toggleStrike().run(),
+    },
+    {
+      key: 'code',
+      label: '&lt;/&gt;',
+      title: 'Inline code',
+      active: editor.isActive('code'),
+      onClick: () => editor.chain().focus().toggleCode().run(),
+    },
+    { key: 'sep4' },
+    {
+      key: 'link',
+      label: '🔗 Link',
+      title: 'Insert link',
+      active: editor.isActive('link'),
+      onClick: setLink,
+    },
+    {
+      key: 'image',
+      label: uploading ? 'Uploading…' : '🖼️ Image',
+      title: 'Insert image',
+      disabled: uploading,
+      onClick: () => setPanel((open) => !open),
+    },
+    {
+      key: 'hr',
+      label: '—',
+      title: 'Horizontal rule',
+      onClick: () => editor.chain().focus().setHorizontalRule().run(),
+    },
+  ]
+
   return (
     <div className="tiptap-editor-wrap">
-      {/* Top Toolbar matching user's Simple Editor screenshot */}
       <div className="tiptap-toolbar">
-        {/* Undo / Redo */}
-        <button
-          type="button"
-          className="tiptap-btn"
-          onClick={() => editor.chain().focus().undo().run()}
-          disabled={!editor.can().undo()}
-          title="Undo (Ctrl+Z)"
-        >
-          ↶
-        </button>
-        <button
-          type="button"
-          className="tiptap-btn"
-          onClick={() => editor.chain().focus().redo().run()}
-          disabled={!editor.can().redo()}
-          title="Redo (Ctrl+Y)"
-        >
-          ↷
-        </button>
-
-        <span className="tiptap-sep" />
-
-        {/* Headings */}
-        <button
-          type="button"
-          className={`tiptap-btn ${editor.isActive('heading', { level: 2 }) ? 'is-active' : ''}`}
-          onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-          title="Heading 2"
-        >
-          H2
-        </button>
-        <button
-          type="button"
-          className={`tiptap-btn ${editor.isActive('heading', { level: 3 }) ? 'is-active' : ''}`}
-          onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-          title="Heading 3"
-        >
-          H3
-        </button>
-        <button
-          type="button"
-          className={`tiptap-btn ${editor.isActive('paragraph') ? 'is-active' : ''}`}
-          onClick={() => editor.chain().focus().setParagraph().run()}
-          title="Normal Paragraph"
-        >
-          ¶
-        </button>
-
-        <span className="tiptap-sep" />
-
-        {/* Lists */}
-        <button
-          type="button"
-          className={`tiptap-btn ${editor.isActive('bulletList') ? 'is-active' : ''}`}
-          onClick={() => editor.chain().focus().toggleBulletList().run()}
-          title="Bullet List"
-        >
-          •≡
-        </button>
-        <button
-          type="button"
-          className={`tiptap-btn ${editor.isActive('orderedList') ? 'is-active' : ''}`}
-          onClick={() => editor.chain().focus().toggleOrderedList().run()}
-          title="Numbered List"
-        >
-          1≡
-        </button>
-        <button
-          type="button"
-          className={`tiptap-btn ${editor.isActive('blockquote') ? 'is-active' : ''}`}
-          onClick={() => editor.chain().focus().toggleBlockquote().run()}
-          title="Blockquote"
-        >
-          ❝
-        </button>
-
-        <span className="tiptap-sep" />
-
-        {/* Text Formats */}
-        <button
-          type="button"
-          className={`tiptap-btn ${editor.isActive('bold') ? 'is-active' : ''}`}
-          onClick={() => editor.chain().focus().toggleBold().run()}
-          title="Bold (Ctrl+B)"
-        >
-          <b>B</b>
-        </button>
-        <button
-          type="button"
-          className={`tiptap-btn ${editor.isActive('italic') ? 'is-active' : ''}`}
-          onClick={() => editor.chain().focus().toggleItalic().run()}
-          title="Italic (Ctrl+I)"
-        >
-          <i>I</i>
-        </button>
-        <button
-          type="button"
-          className={`tiptap-btn ${editor.isActive('underline') ? 'is-active' : ''}`}
-          onClick={() => editor.chain().focus().toggleUnderline().run()}
-          title="Underline (Ctrl+U)"
-        >
-          <u>U</u>
-        </button>
-        <button
-          type="button"
-          className={`tiptap-btn ${editor.isActive('strike') ? 'is-active' : ''}`}
-          onClick={() => editor.chain().focus().toggleStrike().run()}
-          title="Strikethrough"
-        >
-          <s>S</s>
-        </button>
-        <button
-          type="button"
-          className={`tiptap-btn ${editor.isActive('code') ? 'is-active' : ''}`}
-          onClick={() => editor.chain().focus().toggleCode().run()}
-          title="Code snippet"
-        >
-          &lt;/&gt;
-        </button>
-
-        <span className="tiptap-sep" />
-
-        {/* Media & Links */}
-        <button
-          type="button"
-          className={`tiptap-btn ${editor.isActive('link') ? 'is-active' : ''}`}
-          onClick={setLink}
-          title="Insert Link"
-        >
-          🔗 Link
-        </button>
-        <button
-          type="button"
-          className="tiptap-btn"
-          onClick={addImage}
-          title="Insert Image (Upload or URL)"
-        >
-          🖼️ Image
-        </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          style={{ display: 'none' }}
-          onChange={handleFileUpload}
-        />
-        <button
-          type="button"
-          className="tiptap-btn"
-          onClick={() => editor.chain().focus().setHorizontalRule().run()}
-          title="Horizontal Rule"
-        >
-          —
-        </button>
+        {buttons.map((button) =>
+          button.key.startsWith('sep') ? (
+            <span key={button.key} className="tiptap-sep" />
+          ) : (
+            <button
+              key={button.key}
+              type="button"
+              className={`tiptap-btn ${button.active ? 'is-active' : ''}`}
+              onClick={button.onClick}
+              disabled={button.disabled}
+              title={button.title}
+              dangerouslySetInnerHTML={{ __html: button.label }}
+            />
+          ),
+        )}
       </div>
 
-      {/* Editor Surface */}
+      {panel && (
+        <div className="tiptap-image-panel">
+          <div className="tiptap-image-tabs">
+            <button
+              type="button"
+              className={imageMode === 'upload' ? 'active' : ''}
+              onClick={() => setImageMode('upload')}
+            >
+              Upload
+            </button>
+            <button
+              type="button"
+              className={imageMode === 'url' ? 'active' : ''}
+              onClick={() => setImageMode('url')}
+            >
+              Image URL
+            </button>
+          </div>
+
+          <label className="tiptap-field">
+            <span>Description (alt text)</span>
+            <input
+              type="text"
+              value={imageAlt}
+              placeholder="Describes the image for search engines and screen readers"
+              onChange={(event) => setImageAlt(event.target.value)}
+            />
+          </label>
+
+          {imageMode === 'upload' ? (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/avif"
+                onChange={handleFileUpload}
+              />
+              <button
+                type="button"
+                className="tiptap-panel-btn"
+                disabled={uploading}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {uploading ? 'Uploading…' : 'Choose image (max 5 MB)'}
+              </button>
+            </>
+          ) : (
+            <>
+              <label className="tiptap-field">
+                <span>Image URL</span>
+                <input
+                  type="text"
+                  value={imageUrl}
+                  placeholder="/blog/your-image.webp"
+                  onChange={(event) => setImageUrl(event.target.value)}
+                />
+              </label>
+              <button
+                type="button"
+                className="tiptap-panel-btn"
+                onClick={() => insertImage(imageUrl.trim())}
+                disabled={!imageUrl.trim()}
+              >
+                Insert image
+              </button>
+            </>
+          )}
+
+          {imageError && <p className="tiptap-panel-error">{imageError}</p>}
+
+          <button type="button" className="tiptap-panel-cancel" onClick={closePanel}>
+            Cancel
+          </button>
+        </div>
+      )}
+
       <div className="tiptap-content">
         <EditorContent editor={editor} />
       </div>

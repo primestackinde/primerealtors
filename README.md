@@ -1,5 +1,13 @@
 # React + Vite
 
+Prime Realtors website (prime-realtors.in).
+
+- **Article CMS / blog**: see [`docs/BLOG_CMS.md`](docs/BLOG_CMS.md) for the
+  content model, the `/admin` editor, SEO behaviour and the one-time Supabase
+  setup steps.
+- Commands: `npm run dev` (local), `npm run build` (bundle),
+  `npm run lint` (oxlint), `npm test` (vitest).
+
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
 
 Currently, two official plugins are available:

@@ -1,6 +1,6 @@
 import './App.css'
 import { lazy, Suspense, useEffect } from 'react'
-import { Route, Routes, useLocation } from 'react-router-dom'
+import { Link, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom'
 
 import Header from './Components/Header/Header.jsx'
 import Footer from './Components/Footer/Footer.jsx'
@@ -39,13 +39,37 @@ function RouteLoading() {
   )
 }
 
+/** Legacy article URLs are served by a 301 at the edge; this covers local dev. */
+function BlogAlias() {
+  const { slug } = useParams()
+  return <Navigate to={`/news-update/${encodeURIComponent(slug)}`} replace />
+}
+
+/** Real not-found state (the edge function returns 404 for these paths too). */
+function NotFound() {
+  return (
+    <main className="not-found-page">
+      <p className="not-found-code">404</p>
+      <h1>Page not found</h1>
+      <p>The page you are looking for does not exist, has been hidden, or has moved.</p>
+      <div className="not-found-actions">
+        <Link to="/">Back to Home</Link>
+        <Link to="/news-update">News &amp; Updates</Link>
+        <Link to="/contact">Contact Us</Link>
+      </div>
+    </main>
+  )
+}
+
 function App() {
   const location = useLocation()
   const isAdmin = location.pathname.startsWith('/admin')
 
   return (
     <div className="app-shell">
-      {!isAdmin && <SEO />}
+      {/* Also renders on /admin: it applies the noindex + private title there,
+          the edge function injects the same values into the first HTML. */}
+      <SEO />
       {!isAdmin && <Header />}
       <ScrollToTop />
       <Suspense fallback={<RouteLoading />}>
@@ -56,13 +80,14 @@ function App() {
           <Route path="/gallery" element={<Gallery />} />
           <Route path="/news-update" element={<NewsUpdate />} />
           <Route path="/news-update/:slug" element={<BlogPost />} />
-          <Route path="/blog/:slug" element={<BlogPost />} />
+          <Route path="/blog/:slug" element={<BlogAlias />} />
           <Route path="/admin" element={<AdminPortal />} />
           <Route path="/thank-you" element={<ThankYou />} />
           <Route path="/faqs" element={<FAQs />} />
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
           <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
-          <Route path="*" element={<Home />} />
+          <Route path="/" element={<Home />} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
       {!isAdmin && <Footer />}

@@ -1,6 +1,8 @@
 import './Home.css'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { listArticleCards } from '../../data/blogService.js'
+import { formatDate } from '../../config/blogRules.js'
 import homeHero from '../../assets/Home1.webp'
 import layoutMap from '../../assets/layout.webp'
 import natureImage from '../../assets/nature.webp'
@@ -122,6 +124,87 @@ function MetricBand() {
                 <div className="metric-card metric-card-experience"><MetricValue value="10" suffix="+ years" /><span className="metric-label">Local expertise</span><span className="metric-hover-copy">Knowledge that helps you choose clearly.</span></div>
                 <div className="metric-card metric-card-teak"><strong>Teak</strong><span className="metric-label">Plantations</span><span className="metric-hover-copy">Nature already growing with the land.</span></div>
             </div>
+        </section>
+    )
+}
+
+/**
+ * Latest published articles on the home page. Gives new guides an internal
+ * link from the highest-authority page and keeps the landing page in step
+ * with whatever is currently published.
+ */
+function InsightsSection() {
+    const navigate = useNavigate()
+    const [articles, setArticles] = useState([])
+    const [failed, setFailed] = useState(false)
+
+    useEffect(() => {
+        let cancelled = false
+        listArticleCards({ status: 'published' })
+            .then((cards) => {
+                if (cancelled) return
+                setArticles(cards.slice(0, 3))
+                setFailed(false)
+            })
+            .catch(() => {
+                if (!cancelled) setFailed(true)
+            })
+        return () => {
+            cancelled = true
+        }
+    }, [])
+
+    // Nothing to show and no problem to report — do not render an empty block.
+    if (!failed && articles.length === 0) return null
+
+    return (
+        <section className="insights-section content-width">
+            <div className="section-heading insights-heading">
+                <div>
+                    <p className="home-eyebrow">Insights &amp; guides</p>
+                    <h2>Read before you <em>decide.</em></h2>
+                </div>
+                <button className="insights-all" type="button" onClick={() => navigate('/news-update')}>
+                    View all articles <span aria-hidden="true">&#8599;</span>
+                </button>
+            </div>
+
+            {failed ? (
+                <p className="insights-error" role="alert">
+                    Articles could not be loaded right now.{' '}
+                    <button type="button" onClick={() => navigate('/news-update')}>
+                        Open News &amp; Updates
+                    </button>
+                </p>
+            ) : (
+                <div className="insights-grid">
+                    {articles.map((article) => (
+                        <button
+                            className="insights-card"
+                            key={article.id}
+                            type="button"
+                            onClick={() => navigate(`/news-update/${article.slug}`)}
+                        >
+                            <span className="insights-card-media">
+                                <img
+                                    src={article.heroImage}
+                                    alt={article.heroImageAlt || article.title}
+                                    loading="lazy"
+                                    decoding="async"
+                                />
+                            </span>
+                            <span className="insights-card-body">
+                                <span className="insights-card-meta">
+                                    {article.category} · {formatDate(article.publishedAt)}
+                                </span>
+                                <span className="insights-card-title">{article.title}</span>
+                                <span className="insights-card-summary">{article.summary}</span>
+                                <span className="insights-card-cta">Read article &#8599;</span>
+                            </span>
+                        </button>
+                    ))}
+                </div>
+            )}
         </section>
     )
 }
@@ -361,6 +444,10 @@ function Home() {
                     <button className="home-button home-button-light" type="button" onClick={() => navigate('/contact')}>Schedule a  consultation <span>&#8599;</span></button>
                 </div>
             </section>
+
+            {/* Latest published articles */}
+            <InsightsSection />
+
               {/* Looking to buy? */}
             <section className="look-support-section " id="selling">
                 <div className="support-card">

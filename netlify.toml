@@ -5,6 +5,13 @@
 [build.environment]
   NODE_VERSION = "22"
 
+# SEO edge function: injects article/route metadata into the initial HTML for
+# social crawlers, 301s legacy /blog/* URLs, serves the dynamic sitemap and
+# turns unknown routes into real 404s. See docs/BLOG_CMS.md.
+[[edge_functions]]
+  path = "/*"
+  function = "site"
+
 [[redirects]]
   from = "/*"
   to = "/index.html"

@@ -193,3 +193,107 @@
   background: #edf5e7;
   color: #27402f;
 }
+
+/* ==========================================================================
+   Insert-image panel (uploads go to Supabase Storage, not base64)
+   ========================================================================== */
+.tiptap-image-panel {
+  background: #131714;
+  border-bottom: 1px solid #242e26;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tiptap-image-tabs {
+  display: flex;
+  gap: 6px;
+}
+
+.tiptap-image-tabs button {
+  background: transparent;
+  border: 1px solid #38493b;
+  border-radius: 4px;
+  color: #c5d4c8;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 12px;
+}
+
+.tiptap-image-tabs button.active {
+  background: #274b33;
+  border-color: #4a7556;
+  color: #c6df9c;
+}
+
+.tiptap-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.tiptap-field span {
+  color: #8ea394;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.tiptap-field input {
+  background: #1c221e;
+  border: 1px solid #38493b;
+  border-radius: 4px;
+  color: #e5ede7;
+  font-size: 14px;
+  padding: 9px 11px;
+}
+
+.tiptap-field input:focus {
+  border-color: #739259;
+  outline: none;
+}
+
+.tiptap-image-panel input[type='file'] {
+  display: none;
+}
+
+.tiptap-panel-btn {
+  align-self: flex-start;
+  background: #274b33;
+  border: 1px solid #4a7556;
+  border-radius: 4px;
+  color: #c6df9c;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 9px 16px;
+}
+
+.tiptap-panel-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.tiptap-panel-cancel {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  color: #8ea394;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.tiptap-panel-error {
+  background: #3a1d1d;
+  border: 1px solid #7f2b2b;
+  border-radius: 4px;
+  color: #fca5a5;
+  font-size: 12px;
+  margin: 0;
+  padding: 8px 10px;
+}
